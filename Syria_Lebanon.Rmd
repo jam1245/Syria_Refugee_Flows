@@ -1,0 +1,216 @@
+---
+title: "Syria_Lebanon"
+output: html_document
+---
+```{r}
+
+
+# if you chose to pull directly from the site, use the below syntax for your specific country.  
+library(maptools)
+library(raster)
+library(ggplot2)
+library(ggmap)
+
+
+# grab some of the key shapefile we will need. 
+sy_border <- getData("GADM", country="SY", level=0)
+sy_map <- getData("GADM", country="SY", level=2)
+
+lb_border <- getData("GADM", country="LB", level=0)
+lb_map <- getData("GADM", country="LB", level=2)
+
+# take a look at the shapefiles we just pulled 
+plot(lb_map)
+plot(sy_map)
+```
+
+
+
+```{r}
+
+# if your are having trouble loading you can always download the shapefiles and load them like this. 
+library(maptools)
+library(raster)
+library(ggplot2)
+library(ggmap)
+
+
+sy_map <- readRDS("C:/Users/john.mataya/Desktop/Datasets/Syria Data/spatial_data/SYR_adm2.rds")
+
+
+lb_map <- readRDS("C:/Users/john.mataya/Desktop/Datasets/Syria Data/spatial_data/LBN_adm2.rds")
+
+
+```
+
+
+
+
+```{r}
+
+library(readr)
+Lebanon <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Syria_to_Lebanon1.csv", 
+    col_types = cols(Lat.x = col_number(), 
+        Lat.y = col_number(), Lon.x = col_number(), 
+        Lon.y = col_number(), Refugees = col_number()))
+head(Lebanon)
+str(Lebanon)
+```
+
+
+
+
+```{r}
+
+# let's plot our data showing to and drom destinations 
+
+# plot the two countries together and use the curved arrows.  
+pl <- ggplot() + geom_polygon(data = sy_map, aes(long, lat, group=group), fill = 'whitesmoke') + 
+      geom_path(data=sy_map, aes(long,lat, group=group), color="grey", size=0.1) + 
+      geom_polygon(data = lb_map, aes(long, lat, group=group), fill = 'whitesmoke') + 
+      geom_path(data=lb_map, aes(long,lat, group=group), color="grey", size=0.1) 
+
+pl
+  
+
+```
+
+
+```{r}
+pl +  geom_curve(data = Lebanon, aes(x = Lon.x, y = Lat.x, xend = Lon.y, yend = Lat.y), curvature = -0.2, arrow = arrow(length = unit(0.01, 'npc'))) 
+```
+
+
+```{r}
+
+sy_Lebanon <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Syria_to_Lebanon1.csv",
+    col_types = cols(Lat.x = col_number(), 
+        Lat.y = col_number(), Lon.x = col_number(), 
+        Lon.y = col_number(), Refugees = col_number()))
+
+sy_Lebanon$Destination <- NULL 
+sy_Lebanon <- sy_Lebanon[, -c(3:7)] # delete uneeded columns
+
+sy_Lebanon
+
+```
+
+
+
+```{r}
+
+sy_map@data$id <- rownames(sy_map@data)
+
+# rename the columns in my sy_jordan dataframe to do the join
+colnames(sy_Lebanon) <- c("NAME_2", "Refugees")
+
+# perform the join 
+sy_map@data <- join(sy_map@data, sy_Lebanon, by="NAME_2")
+
+sy_map@data$Refugees[5] = 4105
+
+lb_df <- fortify(sy_map)
+lb_df <- join(lb_df, sy_map@data, by="id")
+
+lb_df
+
+
+```
+
+
+
+```{r}
+ggplot() + geom_polygon(data = lb_df, aes(x = long, y = lat, group = group, fill = Refugees), color = "black", size = 0.25) 
+```
+
+
+```{r}
+p <- ggplot() + geom_polygon(data = lb_df, aes(x = long, y = lat, group = group, fill = Refugees), color = "black", size = 0.25) + scale_fill_distiller(name="Refugees", direction = 1, palette = "Reds", breaks = pretty_breaks(n = 5)) + 
+  labs(title="Origins of Syrian Refugees in Jordan")
+
+p
+```
+
+
+```{r}
+p <- p + geom_polygon(data = lb_map, aes(long, lat, group=group), fill = 'whitesmoke') + 
+      geom_path(data=lb_map, aes(long,lat, group=group), color="grey", size=0.1) + 
+      geom_curve(data = Lebanon, aes(x = Lon.x, y = Lat.x, xend = Lon.y, yend = Lat.y), curvature = -0.2, arrow = arrow(length = unit(0.01, 'npc')))
+      
+
+p
+```
+
+
+
+
+```{r}
+# let's add cities - pull the lat and lon from google maps 
+
+city <- c('Aleppo','Al-Hasaka', 'Homs', 'Damascus', 'Lattakia', 'Beirut')
+Lat <- c(36.1956095, 36.5044741,  34.7302927, 33.5074706, 35.549496, 33.88921)
+Lon <- c(37.0551996, 40.7085281,  36.6420627, 36.2478761, 35.911248, 35.4865229) 	 
+
+cities <- data.frame(city, Lat, Lon)
+
+head(cities)
+str(cities)
+```
+
+
+
+
+```{r}
+# add the city names to the map 
+p + geom_point(data = cities, aes(x = Lon, y = Lat), size = 2) + geom_text(data=cities, hjust=0.5, vjust=-0.5, aes(x=Lon, y=Lat, label=city), colour="black", size=3, alpha = 0.6)
+
+
+```
+
+
+
+```{r}
+# this is the final map I want to use.  Still need to add some labels, but this will look better when done in InDesign
+p + geom_point(data = cities, aes(x = Lon, y = Lat), size = 2) + theme_opts
+```
+
+
+
+```{r}
+Leb <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Lebanon.csv", 
+     col_types = cols(Refugees = col_number()))
+
+# we're going to plot this - drop the row with no data 
+Leb <- Leb[-5,]
+```
+
+
+```{r}
+
+p1 <- ggplot(Leb, aes(x = reorder(Location, Refugees), y = Refugees)) + 
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title=" ", subtitle=" ")+
+    labs(x=" ",y=" ") +
+    theme(plot.title = element_text(hjust = -1, vjust=1.12)) +
+    theme(plot.subtitle = element_text(hjust = -.35)) 
+
+```
+
+
+
+```{r}
+theme_opts<-list(theme(panel.grid.minor = element_blank(),
+                        panel.grid.major = element_blank(),
+                        panel.background = element_blank(),
+                        plot.background = element_blank(),
+
+p1 + theme_opts
+```
+
+
+
+
+
+
+
