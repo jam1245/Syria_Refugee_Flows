@@ -1,0 +1,186 @@
+---
+title: "Syria Refugees in Jordan"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+
+
+```{r cars}
+
+library(plyr)
+library(ggplot2)
+library(maptools)
+library(ggmap)
+library(scales)
+library(raster)
+library(readr)
+
+
+
+# grab some of the key shapefile we will need. 
+sy_border <- getData("GADM", country="SY", level=0)
+sy_map <- getData("GADM", country="SY", level=1)
+
+jo_border <- getData("GADM", country="JO", level=0)
+jo_map <- getData("GADM", country="JO", level=1)
+
+# take a look at the shapefiles we just pulled 
+plot(jo_map)
+plot(sy_map)
+
+```
+
+Let's take a look at the Syria shapefile to see what the admin districts are named.  
+```{r}
+sy_map@data$NAME_1
+```
+
+Make sure your file has the same names as the districts.  Names of places might be somewhat different when dealing with different langauges.  For example UNHCR doesn't always report data in the same names as what might be found in the shapefile. 
+```{r}
+sy_jordan <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Syria_ref_in_Jordan_Origins.csv")
+
+jo_df <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Jordan_custom_camp.csv", 
+     col_types = cols(Lat = col_number(), 
+         Lon = col_number()))
+
+sy_jordan$Destination <- NULL 
+sy_jordan <- sy_jordan[, -c(3:6)] # delete columns 5 through 
+sy_jordan <- sy_jordan[-c(15), ]
+
+
+sy_jordan 
+
+
+```
+
+
+And we can join our Refugee count data to the admin areas so that we can visualise it.
+
+You can use the code below to join data from a csv to a shapefile, based on a common spatial value, here it is administrative boundaries, but it could be anything.
+
+```{r}
+
+sy_map@data$id <- rownames(sy_map@data)
+
+# rename the columns in my sy_jordan dataframe to do the join
+colnames(sy_jordan) <- c("NAME_1", "Refugees")
+
+# perform the join 
+sy_map@data <- join(sy_map@data, sy_jordan, by="NAME_1")
+
+# this step was necessary because for some reason the join was creating a single NA for the number of refgueess in Al-Hasakah provence.  Here's I'm manually putting in the number by selecting the df[row number, col number] = value 
+sy_map@data[1, 15] = 5129 
+
+syria_df <- fortify(sy_map)
+syria_df <- join(syria_df, sy_map@data, by="id")
+
+syria_df
+
+```
+
+Now that we have some data ready, let's plot this in ggplot 
+```{r}
+ggplot() + geom_polygon(data = syria_df, aes(x = long, y = lat, group = group, fill = Refugees), color = "black", size = 0.25) 
+```
+
+Let's clean this up just a little bit 
+```{r}
+ggplot() + geom_polygon(data = syria_df, aes(x = long, y = lat, group = group, fill = Refugees), color = "black", size = 0.25) + 
+  scale_fill_distiller(name="Refugees", direction = 1, palette = "Reds", breaks = pretty_breaks(n = 5)) + 
+  labs(title="Origins of Syrian Refugees in Jordan")
+
+
+```
+
+Now let's look at the Jordan map 
+```{r}
+p <- ggplot() + geom_polygon(data = jo_map, aes(long, lat, group=group), fill = 'whitesmoke') + 
+       geom_path(data=jo_map, aes(long,lat, group=group), color="grey", size=0.1) +
+       geom_point(data = jo_df, aes(x = Lon, y = Lat, color = factor(Camp), size = Refugees))
+
+p
+```
+
+
+```{r}
+
+# let's add cities - pull the lat and lon from google maps 
+
+city <- c('Amman')
+Lat <- c(31.8360368)
+Lon <- c(35.6674449) 	 	
+
+cities <- data.frame(city, Lat, Lon)
+
+head(cities)
+str(cities)
+```
+
+
+```{r}
+theme_opts<-list(theme(panel.grid.minor = element_blank(),
+                        panel.grid.major = element_blank(),
+                        panel.background = element_blank(),
+                        plot.background = element_blank(),
+                        axis.line = element_blank(),
+                        axis.text.x = element_blank(),
+                        axis.text.y = element_blank(),
+                        axis.ticks = element_blank(),
+                        axis.title.x = element_blank(),
+                        axis.title.y = element_blank(),
+                        plot.title = element_blank()))
+```
+
+clean this map up just a little bit 
+```{r}
+
+p + geom_point(data = cities, aes(x = Lon, y = Lat), size = 2, alpha = 0.5) + geom_text(data=cities, hjust=0.5, vjust=-0.5, aes(x=Lon, y=Lat, label=city), colour="black", size=3, alpha = 0.6) + theme_opts
+```
+
+
+```{r}
+library(readr)
+Jo <- read_csv("C:/Users/john.mataya/Desktop/Datasets/Syria Data/UNHRC/Custom_Camp/Jordan.csv", 
+    col_types = cols(Camp = col_number(), 
+        Lat = col_number(), Lon = col_number()))
+head(Jo)
+
+Jo$Country <- NULL
+Jo$Lat <- NULL 
+Jo$Lon <- NULL 
+```
+
+
+```{r}
+p2 <- ggplot(Jo, aes(x = reorder(Location, Refugees), y = Refugees)) + 
+    geom_bar(stat = "identity") +
+    coord_flip() +
+    labs(title=" ", subtitle=" ")+
+    labs(x=" ",y=" ") +
+    theme(plot.title = element_text(hjust = -1, vjust=1.12)) +
+    theme(plot.subtitle = element_text(hjust = -.35)) 
+
+
+```
+
+```{r}
+theme_opts<-list(theme(panel.grid.minor = element_blank(),
+                        panel.grid.major = element_blank(),
+                        panel.background = element_blank(),
+                        plot.background = element_blank(),
+
+p1 + theme_opts
+```
+
+
+
+
+
+
+
